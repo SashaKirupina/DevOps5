@@ -2,6 +2,7 @@ name: Build and Delivery
 
 on:
   workflow_run:
+  workflow_dispatch:
     workflows: ["Test Python App"]
     types:
       - completed
