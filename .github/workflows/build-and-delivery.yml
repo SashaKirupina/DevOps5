@@ -2,10 +2,10 @@ name: Build and Delivery
 
 on:
   push:
-    branches: [dev]  # Изменили с main на dev
+    branches: [dev]
   workflow_run:
     workflows: ["Test Python App"]
-    branches: [dev]  # Изменили с main на dev
+    branches: [dev]
     types: [completed]
 
 jobs:
@@ -23,5 +23,8 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v4
       with:
+        context: .
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-app:dev
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/my-app:dev
+          ${{ secrets.DOCKERHUB_USERNAME }}/my-app:latest
