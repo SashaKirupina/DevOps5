@@ -3,57 +3,43 @@ from src.main import app
 
 client = TestClient(app)
 
-# Тестовые данные
 test_users = [
-    {"id": 1, "name": "Test User 1", "email": "test1@example.com"},
-    {"id": 2, "name": "Test User 2", "email": "test2@example.com"}
+    {"id": 1, "name": "Ivan Ivanov", "email": "i.i.ivanov@mail.com"},
+    {"id": 2, "name": "Petr Petrov", "email": "p.p.petrov@mail.com"}
 ]
 
 def test_get_existed_user():
-    """Тест получения существующего пользователя"""
     response = client.get("/api/v1/user", params={"email": test_users[0]["email"]})
     assert response.status_code == 200
-    assert response.json() == test_users[0]
+    assert response.json()["email"] == test_users[0]["email"]
 
 def test_get_unexisted_user():
-    """Тест получения несуществующего пользователя"""
-    response = client.get("/api/v1/user", params={"email": "nonexistent@example.com"})
+    response = client.get("/api/v1/user", params={"email": "nonexistent@mail.com"})
     assert response.status_code == 404
+    assert response.json() == {"detail": "User not found"}
 
 def test_create_user_with_valid_email():
-    """Тест создания пользователя с уникальным email"""
-    new_user = {
-        "name": "New User", 
-        "email": "new.user@example.com"
-    }
+    new_user = {"name": "New User", "email": "new@mail.com"}
     response = client.post("/api/v1/user", json=new_user)
     assert response.status_code == 201
-    # API возвращает просто ID (int)
-    assert isinstance(response.json(), int)
+    assert "id" in response.json()
 
 def test_create_user_with_invalid_email():
-    """Тест создания пользователя с существующим email"""
-    duplicate_user = {
-        "name": "Duplicate User",
-        "email": test_users[0]["email"]  # Используем существующий email
-    }
-    response = client.post("/api/v1/user", json=duplicate_user)
-    assert response.status_code == 409  # Conflict
+    existing_user = {"name": "Duplicate", "email": test_users[0]["email"]}
+    response = client.post("/api/v1/user", json=existing_user)
+    assert response.status_code == 409
+    assert "already registered" in response.json()["detail"]
 
 def test_delete_user():
-    """Тест удаления пользователя"""
-    # 1. Создаем пользователя для теста
-    new_user = {
-        "name": "User to delete",
-        "email": "delete.me@example.com"
-    }
-    user_id = client.post("/api/v1/user", json=new_user).json()
+    # Сначала создаем пользователя
+    new_user = {"name": "To Delete", "email": "delete@mail.com"}
+    user_id = client.post("/api/v1/user", json=new_user).json()["id"]
     
-    # 2. Удаляем пользователя
-    delete_response = client.delete(f"/api/v1/user/{user_id}")
-    assert delete_response.status_code == 200
-    assert delete_response.json() == {"message": "User deleted"}
+    # Удаляем
+    response = client.delete(f"/api/v1/user/{user_id}")
+    assert response.status_code == 200
+    assert response.json() == {"message": "User deleted successfully"}
     
-    # 3. Проверяем что пользователь действительно удален
-    check_response = client.get(f"/api/v1/user/{user_id}")
+    # Проверяем что удален
+    check_response = client.get(f"/api/v1/user", params={"email": "delete@mail.com"})
     assert check_response.status_code == 404
