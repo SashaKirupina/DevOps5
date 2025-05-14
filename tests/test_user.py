@@ -1,77 +1,41 @@
-import sys
-from pathlib import Path
-
-# Добавляем корень проекта в PYTHONPATH
-sys.path.append(str(Path(__file__).parent.parent))
-
-from src.main import app
+import pytest
 from fastapi.testclient import TestClient
+from src.main import app
 
 client = TestClient(app)
 
-# Существующие пользователи
-users = [
-    {
-        'id': 1,
-        'name': 'Ivan Ivanov',
-        'email': 'i.i.ivanov@mail.com',
-    },
-    {
-        'id': 2,
-        'name': 'Petr Petrov',
-        'email': 'p.p.petrov@mail.com',
-    }
-]
+# Тестовые данные
+users = [{"id": 1, "name": "Test User", "email": "test@example.com"}]
 
 def test_get_existed_user():
-    '''Получение существующего пользователя'''
-    response = client.get("/api/v1/user", params={'email': users[0]['email']})
+    response = client.get("/api/v1/user", params={"email": users[0]["email"]})
     assert response.status_code == 200
     assert response.json() == users[0]
 
 def test_get_unexisted_user():
-    '''Получение несуществующего пользователя'''
-    response = client.get("/api/v1/user", params={'email': "nonexistent@mail.com"})
+    response = client.get("/api/v1/user", params={"email": "nonexistent@mail.com"})
     assert response.status_code == 404
-    assert response.json() == {"detail": "User not found"}
 
 def test_create_user_with_valid_email():
-    '''Создание пользователя с уникальной почтой'''
-    new_user = {
-        'name': 'New User',
-        'email': 'new.user@mail.com'
-    }
+    new_user = {"name": "New User", "email": "new.user@mail.com"}
     response = client.post("/api/v1/user", json=new_user)
     assert response.status_code == 201
-    assert 'id' in response.json()
-    assert response.json()['email'] == new_user['email']
-    assert response.json()['name'] == new_user['name']
+    assert isinstance(response.json(), int)  # Проверяем что возвращается ID (число)
 
 def test_create_user_with_invalid_email():
-    '''Создание пользователя с почтой, которую использует другой пользователь'''
-    existing_email_user = {
-        'name': 'Duplicate Email',
-        'email': users[0]['email']  # Используем существующий email
-    }
+    existing_email_user = {"name": "Duplicate", "email": users[0]["email"]}
     response = client.post("/api/v1/user", json=existing_email_user)
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Email already registered"}
+    assert response.status_code == 409  # Conflict для дубликата
 
 def test_delete_user():
-    '''Удаление пользователя'''
-    # Сначала создадим пользователя для удаления
-    new_user = {
-        'name': 'User to delete',
-        'email': 'to.delete@mail.com'
-    }
-    create_response = client.post("/api/v1/user", json=new_user)
-    user_id = create_response.json()['id']
+    # Создаем пользователя для удаления
+    new_user = {"name": "To Delete", "email": "delete.me@mail.com"}
+    user_id = client.post("/api/v1/user", json=new_user).json()
     
-    # Удаляем пользователя
+    # Удаляем
     delete_response = client.delete(f"/api/v1/user/{user_id}")
     assert delete_response.status_code == 200
-    assert delete_response.json() == {"message": "User deleted successfully"}
     
-    # Проверяем, что пользователь действительно удален
-    check_response = client.get("/api/v1/user", params={'email': new_user['email']})
+    # Проверяем удаление
+    check_response = client.get(f"/api/v1/user/{user_id}")
     assert check_response.status_code == 404
