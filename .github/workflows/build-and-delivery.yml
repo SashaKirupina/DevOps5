@@ -1,10 +1,10 @@
 name: Build and Delivery
 
 on:
-  workflow_dispatch:  # Позволяет запускать вручную
+  workflow_dispatch:  # Можно запустить вручную
   workflow_run:
     workflows: ["Test Python App"]
-    branches: [main]
+    branches: [dev]  # Следим за завершением тестов в dev
     types: [completed]
 
 jobs:
