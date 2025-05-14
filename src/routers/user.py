@@ -1,32 +1,54 @@
 from fastapi import APIRouter, HTTPException, status
-
-from src.schemas.user import CreateUser, UserInfo
-from src.fake_db import db
+from pydantic import BaseModel
+from typing import List
 
 router = APIRouter()
 
-@router.get("", status_code=status.HTTP_200_OK, response_model=UserInfo, responses={404: {"detail": "User not found"}})
-async def get_user(email: str):
-    '''Получение пользователя по email'''
-    user = db.get_user_by_email(email)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return UserInfo(
-        id=user['id'],
-        name=user['name'],
-        email=user['email']
-    )
-    
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=int,
-             responses={409: {"detail": "User with this email already exists"}})
-async def create_user(data: CreateUser):
-    '''Создание пользователя'''
-    if db.get_user_by_email(data.email) is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists")
-    db.create_user(data.name, data.email)
-    return db.get_user_by_email(data.email)['id']
+# Модели данных
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
 
-@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(email: str):
-    '''Удаление пользователя'''
-    db.delete_user_by_email(email)
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+# "База данных"
+db: List[User] = [
+    User(id=1, name="Test User 1", email="test1@example.com"),
+    User(id=2, name="Test User 2", email="test2@example.com")
+]
+
+@router.get("/user", response_model=User)
+async def get_user(email: str):
+    """Получение пользователя по email"""
+    user = next((u for u in db if u.email == email), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.post("/user", status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate):
+    """Создание нового пользователя"""
+    if any(u.email == user.email for u in db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+    
+    new_id = max(u.id for u in db) + 1 if db else 1
+    new_user = User(id=new_id, **user.dict())
+    db.append(new_user)
+    return new_user.id  # Возвращаем только ID
+
+@router.delete("/user/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(user_id: int):
+    """Удаление пользователя"""
+    global db
+    user = next((u for u in db if u.id == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db = [u for u in db if u.id != user_id]
+    return {"message": "User deleted"}
